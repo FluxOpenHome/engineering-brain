@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import typer
 
+from eb.wiki.cli import wiki_app
+
 app = typer.Typer(no_args_is_help=True, help="Engineering Brain")
 jobs_app = typer.Typer(help="Job queue")
 app.add_typer(jobs_app, name="jobs")
+app.add_typer(wiki_app, name="wiki")
 
 
 @app.command()

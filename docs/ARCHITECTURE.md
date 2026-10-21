@@ -281,7 +281,7 @@ engineering-brain/
     src/eb/{documents,ingest,retrieval,chat,wiki,compliance,specs,jobs}/
     tests/
   web/                          Next.js app
-  wiki/                         canonical markdown wiki (git-tracked)
+  (EB_WIKI_DIR)                 canonical markdown wiki: its own git repo, default backend/data/wiki
   evals/                        golden sets and eval runners
   deploy/docker-compose.yml, deploy/.env.example
   Makefile

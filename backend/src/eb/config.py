@@ -16,7 +16,10 @@ class Settings(BaseSettings):
     env: str = "dev"
     database_url: str = "postgresql://eb:eb@localhost:5432/engineering_brain"
     data_dir: Path = Field(default=Path("./data"), description="Local object store root")
-    wiki_dir: Path = Field(default=Path("../wiki"), description="Git-tracked markdown wiki")
+    wiki_dir: Path = Field(
+        default=Path("./data/wiki"),
+        description="Markdown wiki: its own git repository (never nested inside this project repo)",
+    )
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     cors_origins: list[str] = ["http://localhost:3000"]

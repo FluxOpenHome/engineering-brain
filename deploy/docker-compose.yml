@@ -26,7 +26,7 @@ services:
       EB_DATABASE_URL: postgresql://eb:${POSTGRES_PASSWORD:-eb}@postgres:5432/engineering_brain
       EB_DATA_DIR: /data
       EB_WIKI_DIR: /wiki
-    volumes: ["objects:/data", "../wiki:/wiki"]
+    volumes: ["objects:/data", "wiki:/wiki"]
     ports: ["8000:8000"]
     depends_on: { postgres: { condition: service_healthy } }
 
@@ -38,7 +38,7 @@ services:
       EB_DATABASE_URL: postgresql://eb:${POSTGRES_PASSWORD:-eb}@postgres:5432/engineering_brain
       EB_DATA_DIR: /data
       EB_WIKI_DIR: /wiki
-    volumes: ["objects:/data", "../wiki:/wiki"]
+    volumes: ["objects:/data", "wiki:/wiki"]
     depends_on: { postgres: { condition: service_healthy } }
 
   web:
@@ -76,4 +76,5 @@ services:
 volumes:
   pgdata: {}
   objects: {}
+  wiki: {}      # the wiki's own git repository; mount a host clone instead to push to a remote
   hf-cache: {}

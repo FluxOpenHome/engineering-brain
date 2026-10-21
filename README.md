@@ -23,11 +23,13 @@ Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Decisions: [`decis
 ```
 backend/   Python 3.13 · FastAPI · psycopg · pgvector · Anthropic SDK   (API + worker, package `eb`)
 web/       Next.js · Tiptap                                            (documents, search, chat, wiki, review, compliance, specs)
-wiki/      git-tracked markdown wiki (canonical)
 evals/     golden sets and eval runners
 deploy/    docker-compose.yml, .env.example
 docs/      architecture; decisions/ ADRs; reports/ + research_notes/ research
 ```
+
+The wiki itself is a separate git repository of markdown files at `EB_WIKI_DIR` (default
+`backend/data/wiki`, created on first use); point it at a clone with a remote to share it.
 
 ## Quick start (development)
 
@@ -57,6 +59,12 @@ python evals/run_qa.py --api http://localhost:8000   # golden QA set against a r
 
 ## Status
 
-Phase 0–1 complete (schema, job queue, ingest, hybrid search, cited chat). Phases 2–4 (wiki with
-review queue, compliance engine, spec authoring) and the web UI are in progress. See
-`docs/ARCHITECTURE.md` section 11.
+Phases 0–4 are implemented and tested with a fake LLM and a lexical stand-in embedder:
+schema and job queue; ingest (text-layer parsing, clause/table chunking); hybrid search; cited
+chat; git-backed wiki with proposals, review queue and publish-only indexing; compliance engine
+with code-verified quotes, unit-aware numeric checks and a human review queue; INCOSE/EARS spec
+checker and template-driven spec drafting; the Next.js UI for all of it.
+
+Not yet exercised against real services: the Anthropic API path (needs `ANTHROPIC_API_KEY`),
+TEI embeddings/reranking, and the Docling layout pass. Phase 5 (GPU layout pass, reranking,
+contextual prefixes, drawings route, SSO, Langfuse) is next. See `docs/ARCHITECTURE.md` section 11.
