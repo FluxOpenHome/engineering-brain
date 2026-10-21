@@ -1,0 +1,19 @@
+# Golden question set for retrieval and answer evaluation (architecture section 9).
+# Each item names the document(s) that must be cited and a phrase the answer must contain.
+# Add items as real documents are ingested; keep expected phrases verbatim from the source.
+- id: qa-001
+  question: What is the casing design pressure required by PS-100?
+  must_cite: [PS-100]
+  must_contain: ["16 bar"]
+- id: qa-002
+  question: What rated flow and head does PS-100 specify?
+  must_cite: [PS-100]
+  must_contain: ["250 m3/h", "45 m"]
+- id: qa-003
+  question: Which performance test standard applies to the PS-100 pump?
+  must_cite: [PS-100]
+  must_contain: ["ISO 9906"]
+- id: qa-004
+  question: What casing material does the CX-250 supplier offer?
+  must_cite: [DS-CX-250]
+  must_contain: ["ductile iron"]

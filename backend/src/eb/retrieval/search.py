@@ -101,25 +101,31 @@ _WIKI_FROM = " FROM wiki_chunks c JOIN wiki_pages p ON p.id = c.page_id WHERE p.
 
 
 def _keyword(conn, query: str, scope: Scope, user: Principal, k: int) -> list[dict]:
+    """Keyword candidates. First pass ANDs all terms (websearch syntax); if that yields fewer
+    than k/4 hits (typical for natural-language questions), a second pass ORs the terms so a
+    question like "How fast must the valve close?" still reaches the clause about valve closure."""
     hits: list[dict] = []
-    if scope.include_documents:
-        where, args = _doc_filters(scope, user)
-        rows = conn.execute(
-            f"SELECT {_DOC_COLS} {_DOC_FROM} WHERE {where}"
-            " AND c.tsv @@ websearch_to_tsquery('english', %s)"
-            " ORDER BY ts_rank_cd(c.tsv, websearch_to_tsquery('english', %s)) DESC LIMIT %s",
-            (*args, query, query, k),
-        ).fetchall()
-        hits += [dict(r, source="document") for r in rows]
-    if scope.include_wiki:
-        rows = conn.execute(
-            f"SELECT {_WIKI_COLS} {_WIKI_FROM}"
-            " AND c.tsv @@ websearch_to_tsquery('english', %s)"
-            " ORDER BY ts_rank_cd(c.tsv, websearch_to_tsquery('english', %s)) DESC LIMIT %s",
-            (query, query, k),
-        ).fetchall()
-        hits += [dict(r, source="wiki") for r in rows]
-    return hits
+    for tsq in ("websearch_to_tsquery('english', %s)",
+                "replace(plainto_tsquery('english', %s)::text, '&', '|')::tsquery"):
+        seen = {h["id"] for h in hits}
+        if scope.include_documents:
+            where, args = _doc_filters(scope, user)
+            rows = conn.execute(
+                f"SELECT {_DOC_COLS} {_DOC_FROM} WHERE {where} AND c.tsv @@ {tsq}"
+                f" ORDER BY ts_rank_cd(c.tsv, {tsq}) DESC LIMIT %s",
+                (*args, query, query, k),
+            ).fetchall()
+            hits += [dict(r, source="document") for r in rows if r["id"] not in seen]
+        if scope.include_wiki:
+            rows = conn.execute(
+                f"SELECT {_WIKI_COLS} {_WIKI_FROM} AND c.tsv @@ {tsq}"
+                f" ORDER BY ts_rank_cd(c.tsv, {tsq}) DESC LIMIT %s",
+                (query, query, k),
+            ).fetchall()
+            hits += [dict(r, source="wiki") for r in rows if r["id"] not in seen]
+        if len(hits) >= max(1, k // 4):
+            break
+    return hits[:k]
 
 
 def _dense(conn, qvec: list[float], scope: Scope, user: Principal, k: int) -> list[dict]:

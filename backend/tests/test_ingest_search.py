@@ -70,3 +70,11 @@ def test_acl_hides_documents_from_other_groups(client, sample_spec, db, fake_llm
     assert client.get(f"/documents/{a['document_id']}").status_code == 404
     hits = client.post("/search", json={"query": "pump design pressure"}).json()["hits"]
     assert hits == []
+
+
+def test_keyword_falls_back_to_or_semantics(client, sample_spec, fake_llm):
+    _upload(client, sample_spec, "ps-100.md", doc_number="PS-100")
+    run_pending_once()
+    # "witnessed" + "purchaser" exist; "ceremony" does not, so AND matching finds nothing.
+    hits = client.post("/search", json={"query": "witnessed ceremony purchaser", "k": 5}).json()["hits"]
+    assert any(h["clause_id"] == "5.1" and h["rank_keyword"] is not None for h in hits)

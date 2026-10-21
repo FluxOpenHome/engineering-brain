@@ -1,29 +1,62 @@
 # Engineering Brain
 
-A personal knowledge base for engineering: notes, decisions, patterns, and lessons learned.
+A self-hosted knowledge platform for multi-disciplinary engineering teams: upload thousands of
+documents, keep a reviewed Wikipedia-style wiki that the system drafts from those documents,
+chat with everything with page-level citations, check supplier documents against requirement
+specifications clause by clause, and author equipment specifications with built-in rule checks.
 
-## Structure
+Disciplines in scope: fluid systems, electrical, civil, structural, mechanical, chemical,
+materials, with systems-integration (interface) awareness across them.
+
+## Design in one paragraph
+
+Compose, don't fork. PostgreSQL (pgvector + tsvector) is the single store; markdown with
+frontmatter in git is the canonical wiki with a web editor and a review queue in front of every
+machine-written change; parsing and clause-level chunking decide answer quality; hybrid retrieval
+with reranking; the LLM extracts and matches, code verifies quotes and compares numbers with
+units, and anything uncertain goes to a human. Full reasoning and evidence:
+[`reports/Engineering knowledge platform research.md`](reports/Engineering%20knowledge%20platform%20research.md).
+Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Decisions: [`decisions/`](decisions/).
+
+## Layout
 
 ```
-.
-├── notes/        # Raw notes and working thoughts
-├── decisions/    # Architecture and design decisions (one file per decision)
-├── patterns/     # Reusable approaches, snippets, and checklists
-└── resources/    # Links, papers, and reading lists
+backend/   Python 3.13 · FastAPI · psycopg · pgvector · Anthropic SDK   (API + worker, package `eb`)
+web/       Next.js · Tiptap                                            (documents, search, chat, wiki, review, compliance, specs)
+wiki/      git-tracked markdown wiki (canonical)
+evals/     golden sets and eval runners
+deploy/    docker-compose.yml, .env.example
+docs/      architecture; decisions/ ADRs; reports/ + research_notes/ research
 ```
 
-## Conventions
+## Quick start (development)
 
-- One topic per file, written in Markdown.
-- Use lowercase, hyphenated filenames (`event-sourcing.md`).
-- Date-stamp decisions: `decisions/2026-10-21-choose-postgres.md`.
-- Keep entries short. Link out instead of copying.
-
-## Getting started
+Prerequisites: Python 3.13 with [uv](https://docs.astral.sh/uv/), Node 22, PostgreSQL 16 with the
+pgvector extension (or `docker compose -f deploy/docker-compose.yml up postgres`).
 
 ```sh
-git clone https://github.com/<your-username>/engineering-brain.git
-cd engineering-brain
+# database role/db used by the defaults: eb/eb @ localhost:5432/engineering_brain
+make setup            # backend deps (uv) + web deps (npm)
+cp backend/.env.example backend/.env
+make migrate
+make api              # http://localhost:8000  (OpenAPI docs at /docs)
+make worker           # in a second terminal: parses, embeds, proposes, checks
+make web              # http://localhost:3000
 ```
 
-Add a note, commit, push. That's the whole workflow.
+Without an `ANTHROPIC_API_KEY`, set `EB_LLM_PROVIDER=fake` to exercise the pipeline; without a
+GPU, `EB_EMBEDDING_PROVIDER=hash` gives a lexical stand-in embedder. Production uses TEI with
+Qwen3-Embedding and Qwen3-Reranker (see `deploy/docker-compose.yml`, `gpu` profile).
+
+## Tests
+
+```sh
+make test             # ruff + pytest against a dedicated test database
+python evals/run_qa.py --api http://localhost:8000   # golden QA set against a running stack
+```
+
+## Status
+
+Phase 0–1 complete (schema, job queue, ingest, hybrid search, cited chat). Phases 2–4 (wiki with
+review queue, compliance engine, spec authoring) and the web UI are in progress. See
+`docs/ARCHITECTURE.md` section 11.
