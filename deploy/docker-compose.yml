@@ -1,0 +1,79 @@
+# Engineering Brain: single-host deployment (architecture section 8).
+# Dev: `docker compose up postgres` and run api/worker/web locally.
+# GPU services (tei-embed, tei-rerank, parser) are under the "gpu" profile.
+name: engineering-brain
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: eb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eb}
+      POSTGRES_DB: engineering_brain
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eb -d engineering_brain"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: { context: ../backend }
+    command: ["eb", "serve"]
+    env_file: [.env]
+    environment:
+      EB_DATABASE_URL: postgresql://eb:${POSTGRES_PASSWORD:-eb}@postgres:5432/engineering_brain
+      EB_DATA_DIR: /data
+      EB_WIKI_DIR: /wiki
+    volumes: ["objects:/data", "../wiki:/wiki"]
+    ports: ["8000:8000"]
+    depends_on: { postgres: { condition: service_healthy } }
+
+  worker:
+    build: { context: ../backend }
+    command: ["eb", "worker"]
+    env_file: [.env]
+    environment:
+      EB_DATABASE_URL: postgresql://eb:${POSTGRES_PASSWORD:-eb}@postgres:5432/engineering_brain
+      EB_DATA_DIR: /data
+      EB_WIKI_DIR: /wiki
+    volumes: ["objects:/data", "../wiki:/wiki"]
+    depends_on: { postgres: { condition: service_healthy } }
+
+  web:
+    build: { context: ../web }
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+  # ---- GPU tier -----------------------------------------------------------
+  tei-embed:
+    profiles: ["gpu"]
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
+    command: ["--model-id", "Qwen/Qwen3-Embedding-0.6B", "--max-client-batch-size", "128"]
+    ports: ["8080:80"]
+    volumes: ["hf-cache:/data"]
+    deploy: { resources: { reservations: { devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }] } } }
+
+  tei-rerank:
+    profiles: ["gpu"]
+    image: ghcr.io/huggingface/text-embeddings-inference:latest
+    command: ["--model-id", "Qwen/Qwen3-Reranker-0.6B"]
+    ports: ["8081:80"]
+    volumes: ["hf-cache:/data"]
+    deploy: { resources: { reservations: { devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }] } } }
+
+  # CPU-only embedding alternative for small deployments:
+  tei-embed-cpu:
+    profiles: ["cpu-embed"]
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-latest
+    command: ["--model-id", "Qwen/Qwen3-Embedding-0.6B"]
+    ports: ["8080:80"]
+    volumes: ["hf-cache:/data"]
+
+volumes:
+  pgdata: {}
+  objects: {}
+  hf-cache: {}
