@@ -18,6 +18,14 @@ from eb.config import get_settings
 _pool: ConnectionPool | None = None
 
 
+class DatabaseUnavailable(RuntimeError):
+    """Raised when PostgreSQL cannot be reached; the message tells the operator what to do."""
+
+
+def _redact(url: str) -> str:
+    return re.sub(r"://([^:/@]+):[^@]*@", r"://\1:***@", url)
+
+
 def _configure(conn: psycopg.Connection) -> None:
     # The vector type does not exist before the first migration runs; tolerate that and
     # let migrate() reset the pool so later connections register the adapter.
@@ -31,6 +39,18 @@ def get_pool() -> ConnectionPool:
     global _pool
     if _pool is None:
         s = get_settings()
+        # Fail fast with one clear message when the database is unreachable, instead of
+        # letting the pool retry and log for 30 seconds.
+        try:
+            psycopg.connect(s.database_url, connect_timeout=5).close()
+        except psycopg.OperationalError as e:
+            raise DatabaseUnavailable(
+                f"Cannot connect to PostgreSQL at {_redact(s.database_url)}: "
+                f"{str(e).strip().splitlines()[0]}\n"
+                "Start the database first, for example:\n"
+                "  docker compose -f deploy/docker-compose.yml up -d postgres\n"
+                "or set EB_DATABASE_URL to a running PostgreSQL 16 with the pgvector extension."
+            ) from e
         _pool = ConnectionPool(
             s.database_url,
             min_size=1,
